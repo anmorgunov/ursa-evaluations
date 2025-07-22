@@ -21,9 +21,9 @@ LOGGING_CONFIG: dict[str, Any] = {
         }
     },
     "loggers": {
-        "batistatemplate": {
+        "ursa": {
             "handlers": ["console"],
-            "propagate": False,
+            "propagate": True,
             "level": "INFO",  # Default level
         }
     },
@@ -35,19 +35,18 @@ def setup_logging() -> None:
     """Setup logging configuration from hardcoded dict with environment variable override"""
 
     # Get log level from environment variable, default to INFO if not set
-    log_level = os.getenv("BATISTATEMPLATE_LOG_LEVEL", "INFO").upper()
+    log_level = os.getenv("URSA_LOG_LEVEL", "INFO").upper()
 
     # Validate the log level
     valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
     if log_level not in valid_levels:
         print(f"Invalid log level {log_level}, defaulting to INFO")
-        log_level = "INFO"  # Make sure to reset if invalid
+        log_level = "INFO"
 
     # Override the log level in the copied config
-    LOGGING_CONFIG["loggers"]["batistatemplate"]["level"] = log_level
+    LOGGING_CONFIG["loggers"]["ursa"]["level"] = log_level
 
     logging.config.dictConfig(LOGGING_CONFIG)
 
 
-# Get the logger for the 'batistatemplate' application.
-logger = logging.getLogger("batistatemplate")
+logger = logging.getLogger("ursa")
