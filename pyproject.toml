@@ -1,19 +1,19 @@
 [project]
-name = "batistatemplate"
+name = "ursa"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "numpy>=2.2.3",
+    "pydantic>=2.11.7",
     "tqdm>=4.67.1",
 ]
 authors = [{ name = "Anton Morgunov", email = "anton@ischemist.com" }]
 license = { text = "MIT" }
 
 [project.urls]
-Homepage = "https://github.com/batistagroup/batistatemplate"
-Issues = "https://github.com/batistagroup/batistatemplate/issues"
+Homepage = "https://github.com/batistagroup/ursa"
+Issues = "https://github.com/batistagroup/ursa/issues"
 
 
 [tool.setuptools]
@@ -28,9 +28,6 @@ dev = [
     "ruff>=0.9.6",
     "pytest>=8.3.4",
     "mypy>=1.15.0",
-    "mkdocs>=1.6.1",
-    "mkdocstrings-python>=1.15.0",
-    "mkdocs-material>=9.6.4",
     "types-tqdm>=4.67.0.20241221",
 ]
 
