@@ -2,9 +2,9 @@
 
 import pytest
 
-from ursa.adapters.dms_adapter import DMSAdapter
+from ursa.adapters.dms_adapter import DMSAdapter, DMSTree
 from ursa.domain.chem import canonicalize_smiles
-from ursa.domain.schemas import BenchmarkTree, DMSTree, TargetInfo
+from ursa.domain.schemas import BenchmarkTree, TargetInfo
 from ursa.exceptions import AdapterLogicError
 
 
