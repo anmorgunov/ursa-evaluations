@@ -1,15 +1,35 @@
 from collections.abc import Generator
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, RootModel, ValidationError
 
 from ursa.adapters.base_adapter import BaseAdapter
 from ursa.domain.chem import canonicalize_smiles
-from ursa.domain.schemas import BenchmarkTree, DMSRouteList, DMSTree, MoleculeNode, ReactionNode, TargetInfo
+from ursa.domain.schemas import BenchmarkTree, MoleculeNode, ReactionNode, TargetInfo
 from ursa.exceptions import AdapterLogicError, UrsaException
 from ursa.typing import ReactionSmilesStr, SmilesStr
 from ursa.utils.hashing import generate_molecule_hash
 from ursa.utils.logging import logger
+
+
+class DMSTree(BaseModel):
+    """
+    A Pydantic model for the raw output from "DMS" models.
+
+    This recursively validates the structure of a synthetic tree node,
+    ensuring it has a 'smiles' string and a list of 'children' nodes.
+    """
+
+    smiles: str  # we don't canonicalize yet; this is raw input
+    children: list["DMSTree"] = Field(default_factory=list)
+
+
+class DMSRouteList(RootModel[list[DMSTree]]):
+    """
+    Represents the raw model output for a single target, which is a list of routes.
+    """
+
+    pass
 
 
 class DMSAdapter(BaseAdapter):

@@ -1,31 +1,7 @@
-from pydantic import BaseModel, Field, RootModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from ursa.exceptions import SchemaLogicError
 from ursa.typing import ReactionSmilesStr, SmilesStr
-
-# -------------------------------------------------------------------
-#  Input Schema (Validates the raw model output)
-# -------------------------------------------------------------------
-
-
-class DMSTree(BaseModel):
-    """
-    A Pydantic model for the raw output from "DMS" models.
-
-    This recursively validates the structure of a synthetic tree node,
-    ensuring it has a 'smiles' string and a list of 'children' nodes.
-    """
-
-    smiles: str  # we don't canonicalize yet; this is raw input
-    children: list["DMSTree"] = Field(default_factory=list)
-
-
-class DMSRouteList(RootModel[list[DMSTree]]):
-    """
-    Represents the raw model output for a single target, which is a list of routes.
-    """
-
-    pass
 
 
 class RunStatistics(BaseModel):

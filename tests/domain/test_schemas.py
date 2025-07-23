@@ -1,9 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
+from ursa.adapters.dms_adapter import DMSTree
 from ursa.domain.schemas import (
     BenchmarkTree,
-    DMSTree,
     MoleculeNode,
     ReactionNode,
     TargetInfo,
