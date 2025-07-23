@@ -1,6 +1,20 @@
 import hashlib
+from pathlib import Path
 
+from ursa.exceptions import UrsaException
 from ursa.typing import SmilesStr
+from ursa.utils.logging import logger
+
+
+def get_file_hash(path: Path) -> str:
+    """Computes the sha256 hash of a file's content."""
+    try:
+        with path.open("rb") as f:
+            file_bytes = f.read()
+            return hashlib.sha256(file_bytes).hexdigest()
+    except OSError as e:
+        logger.error(f"Could not read file for hashing: {path}")
+        raise UrsaException(f"File I/O error on {path}: {e}") from e
 
 
 def generate_molecule_hash(smiles: SmilesStr) -> str:
@@ -16,7 +30,7 @@ def generate_molecule_hash(smiles: SmilesStr) -> str:
     # we encode to bytes before hashing
     smiles_bytes = smiles.encode("utf-8")
     hasher = hashlib.sha256(smiles_bytes)
-    return f"sha256:{hasher.hexdigest()}"
+    return f"sha256-{hasher.hexdigest()}"
 
 
 def generate_run_hash(model_name: str, file_hashes: list[str]) -> str:
@@ -37,4 +51,4 @@ def generate_run_hash(model_name: str, file_hashes: list[str]) -> str:
     run_signature = model_name + "".join(sorted_hashes)
     run_bytes = run_signature.encode("utf-8")
     hasher = hashlib.sha256(run_bytes)
-    return f"ursa-run:{hasher.hexdigest()}"
+    return f"ursa-run-{hasher.hexdigest()}"

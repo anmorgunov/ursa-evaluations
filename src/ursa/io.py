@@ -1,26 +1,23 @@
-# src/ursa/io.py
-
 import gzip
-import hashlib
 import json
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
 
-from ursa.exceptions import UrsaException
+from ursa.exceptions import UrsaException, UrsaIOException, UrsaSerializationError
 from ursa.utils.logging import logger
 
 
-def get_file_hash(path: Path) -> str:
-    """Computes the sha256 hash of a file's content."""
+def save_json(data: dict[str, Any], path: Path) -> None:
+    """Saves a Python dictionary to a standard, uncompressed JSON file."""
     try:
-        with path.open("rb") as f:
-            file_bytes = f.read()
-            return hashlib.sha256(file_bytes).hexdigest()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
     except OSError as e:
-        logger.error(f"Could not read file for hashing: {path}")
-        raise UrsaException(f"File I/O error on {path}: {e}") from e
+        logger.error(f"Failed to write to JSON file: {path}")
+        raise UrsaException(f"Data saving error on {path}: {e}") from e
 
 
 def load_json_gz(path: Path) -> dict[str, Any]:
@@ -33,16 +30,25 @@ def load_json_gz(path: Path) -> dict[str, Any]:
         raise UrsaException(f"Data loading error on {path}: {e}") from e
 
 
+def _pydantic_encoder(obj: Any) -> Any:
+    if isinstance(obj, BaseModel):
+        return obj.model_dump()
+    # Raise our specific exception instead of a generic TypeError
+    raise UrsaSerializationError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
+
+
 def save_json_gz(data: dict[str, Any], path: Path) -> None:
-    """Saves a Python dictionary to a gzipped JSON file."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        json_str = json.dumps(data, indent=2)
+        json_str = json.dumps(data, indent=2, default=_pydantic_encoder)
         with gzip.open(path, "wt", encoding="utf-8") as f:
             f.write(json_str)
-    except OSError as e:
-        logger.error(f"Failed to write to gzipped JSON file: {path}")
-        raise UrsaException(f"Data saving error on {path}: {e}") from e
+    except UrsaSerializationError as e:
+        # Re-raise the specific error so it's not caught by the generic handler
+        raise e
+    except Exception as e:
+        # Wrap any other error (IOError, etc.) in our custom IO exception
+        raise UrsaIOException(f"Failed to write or serialize gzipped JSON to {path}: {e}") from e
 
 
 def save_pydantic_model_gz(model: BaseModel, path: Path) -> None:

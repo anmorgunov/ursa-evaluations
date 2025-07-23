@@ -14,3 +14,15 @@ class SchemaLogicError(UrsaException):
     """Raised when data violates the logical rules of a schema, beyond basic type validation."""
 
     pass
+
+
+class UrsaIOException(UrsaException):
+    """Raised for file system or I/O related errors during processing."""
+
+    pass
+
+
+class UrsaSerializationError(UrsaException):
+    """Raised when data cannot be serialized to the desired format (e.g., JSON)."""
+
+    pass

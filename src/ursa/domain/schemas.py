@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, RootModel, model_validator
 
 from ursa.exceptions import SchemaLogicError
 from ursa.typing import ReactionSmilesStr, SmilesStr
@@ -18,6 +18,15 @@ class DMSTree(BaseModel):
 
     smiles: str  # we don't canonicalize yet; this is raw input
     children: list["DMSTree"] = Field(default_factory=list)
+
+
+class DMSRouteList(RootModel[list[DMSTree]]):
+    """
+    Represents the raw model output for a single target, which is a list of routes.
+    This is the schema we will validate the raw input against.
+    """
+
+    pass
 
 
 # -------------------------------------------------------------------
@@ -50,9 +59,9 @@ class MoleculeNode(BaseModel):
     smiles: SmilesStr
     is_starting_material: bool
     reactions: list[ReactionNode] = Field(default_factory=list)
-    
-    @model_validator(mode='after')
-    def check_tree_logic(self) -> 'MoleculeNode':
+
+    @model_validator(mode="after")
+    def check_tree_logic(self) -> "MoleculeNode":
         """
         Enforces the logical consistency of a node in a retrosynthetic tree.
         """
@@ -67,9 +76,7 @@ class MoleculeNode(BaseModel):
         # Rule 2: An intermediate must be the product of exactly one reaction in a valid tree.
         if not self.is_starting_material:
             if num_reactions == 0:
-                 raise SchemaLogicError(
-                    f"Node {self.id} ({self.smiles}) is an intermediate but has no parent reaction."
-                )
+                raise SchemaLogicError(f"Node {self.id} ({self.smiles}) is an intermediate but has no parent reaction.")
             if num_reactions > 1:
                 raise SchemaLogicError(
                     f"Node {self.id} ({self.smiles}) is part of a DAG (has {num_reactions} reactions), not a tree."

@@ -47,7 +47,7 @@ def load_and_prepare_targets(file_path: Path) -> dict[str, TargetInfo]:
 
     Returns:
         A dictionary mapping target IDs to validated TargetInfo objects.
-    
+
     Raises:
         UrsaException: If a target SMILES is invalid.
     """
@@ -69,7 +69,7 @@ def load_and_prepare_targets(file_path: Path) -> dict[str, TargetInfo]:
             logger.error(f"Invalid SMILES for target '{target_id}': {raw_smiles}. Cannot proceed.")
             # This is a fatal error for a run; we must have valid targets.
             raise e
-    
+
     logger.info(f"Successfully prepared {len(prepared_targets)} targets.")
     return prepared_targets
 

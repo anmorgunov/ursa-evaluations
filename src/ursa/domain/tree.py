@@ -36,11 +36,11 @@ def _generate_tree_signature(node: MoleculeNode, memo: dict[str, str]) -> str:
 
     # The final signature string incorporates the history and the result.
     signature_string = "".join(sorted_signatures) + ">>" + node.molecule_hash
-    signature_bytes = signature_string.encode('utf-8')
-    
+    signature_bytes = signature_string.encode("utf-8")
+
     # Hash the canonical representation to get the final signature
     final_signature = f"tree_sha256:{hashlib.sha256(signature_bytes).hexdigest()}"
-    
+
     memo[node.id] = final_signature
     return final_signature
 
@@ -60,8 +60,8 @@ def deduplicate_routes(routes: list[BenchmarkTree]) -> list[BenchmarkTree]:
     """
     seen_signatures = set()
     unique_routes = []
-    
-    logger.info(f"Deduplicating {len(routes)} routes...")
+
+    logger.debug(f"Deduplicating {len(routes)} routes...")
 
     for route in routes:
         # memoization cache is fresh for each independent tree
@@ -71,9 +71,9 @@ def deduplicate_routes(routes: list[BenchmarkTree]) -> list[BenchmarkTree]:
         if signature not in seen_signatures:
             seen_signatures.add(signature)
             unique_routes.append(route)
-            
+
     num_removed = len(routes) - len(unique_routes)
     if num_removed > 0:
-        logger.info(f"Removed {num_removed} duplicate routes.")
-        
+        logger.debug(f"Removed {num_removed} duplicate routes.")
+
     return unique_routes

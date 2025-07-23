@@ -53,3 +53,4 @@ lint.select = [
     "SIM", # flake8-simplify
     "I",   # isort
 ]
+lint.ignore = ["E501"] 
