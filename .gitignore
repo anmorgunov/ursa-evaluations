@@ -14,3 +14,14 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Jupyter Trash
+*.ipynb
+
+# Data
+data/evaluations/
+data/processed/
+data/**/*.json.gz
+
+# AI
+_prompts/

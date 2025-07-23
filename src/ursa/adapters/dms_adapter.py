@@ -1,0 +1,91 @@
+from collections.abc import Generator
+from typing import Any
+
+from pydantic import ValidationError
+
+from ursa.adapters.base_adapter import BaseAdapter
+from ursa.domain.chem import canonicalize_smiles
+from ursa.domain.schemas import BenchmarkTree, DMSRouteList, DMSTree, MoleculeNode, ReactionNode, TargetInfo
+from ursa.exceptions import AdapterLogicError, UrsaException
+from ursa.typing import ReactionSmilesStr, SmilesStr
+from ursa.utils.hashing import generate_molecule_hash
+from ursa.utils.logging import logger
+
+
+class DMSAdapter(BaseAdapter):
+    """Adapter for converting DMS-style model outputs to the BenchmarkTree schema."""
+
+    def adapt(self, raw_target_data: Any, target_info: TargetInfo) -> Generator[BenchmarkTree, None, None]:
+        """
+        Validates raw DMS data, transforms it, and yields BenchmarkTree objects.
+        """
+        try:
+            # 1. Model-specific validation happens HERE, inside the adapter.
+            validated_routes = DMSRouteList.model_validate(raw_target_data)
+        except ValidationError as e:
+            logger.warning(f"  - Raw data for target '{target_info.id}' failed DMS schema validation. Error: {e}")
+            return  # Stop processing this target
+
+        # 2. Iterate and transform each valid route
+        for dms_tree_root in validated_routes.root:
+            try:
+                # The private _transform method now only handles one route at a time
+                tree = self._transform(dms_tree_root, target_info)
+                yield tree
+            except UrsaException as e:
+                # A single route failed, log it and continue with the next one.
+                logger.warning(f"  - Route for '{target_info.id}' failed transformation: {e}")
+                continue
+
+    def _transform(self, raw_data: DMSTree, target_info: TargetInfo) -> BenchmarkTree:
+        """
+        Orchestrates the transformation of a single DMS output tree.
+        Raises UrsaException on failure.
+        """
+        # begin the recursion from the root node
+        retrosynthetic_tree = self._build_molecule_node(dms_node=raw_data, path_prefix="ursa-mol-root")
+
+        # Final validation: does the transformed tree root match the canonical target smiles?
+        if retrosynthetic_tree.smiles != target_info.smiles:
+            # this is a logic error, not a parse error
+            msg = (
+                f"Mismatched SMILES for target {target_info.id}. "
+                f"Expected canonical: {target_info.smiles}, but adapter produced: {retrosynthetic_tree.smiles}"
+            )
+            logger.error(msg)
+            raise AdapterLogicError(msg)
+
+        return BenchmarkTree(target=target_info, retrosynthetic_tree=retrosynthetic_tree)
+
+    def _build_molecule_node(self, dms_node: DMSTree, path_prefix: str) -> MoleculeNode:
+        """
+        Recursively builds a MoleculeNode. This will propagate InvalidSmilesError if it occurs.
+        """
+        canon_smiles = canonicalize_smiles(dms_node.smiles)
+        is_starting_mat = not bool(dms_node.children)
+        reactions = []
+
+        if not is_starting_mat:
+            reactants: list[MoleculeNode] = []
+            reactant_smiles_list: list[SmilesStr] = []
+
+            for i, child_node in enumerate(dms_node.children):
+                reactant_node = self._build_molecule_node(dms_node=child_node, path_prefix=f"{path_prefix}-{i}")
+                reactants.append(reactant_node)
+                reactant_smiles_list.append(reactant_node.smiles)
+
+            reaction_smiles = ReactionSmilesStr(f"{'.'.join(sorted(reactant_smiles_list))}>>{canon_smiles}")
+
+            reactions.append(
+                ReactionNode(
+                    id=path_prefix.replace("ursa-mol", "ursa-rxn"), reaction_smiles=reaction_smiles, reactants=reactants
+                )
+            )
+
+        return MoleculeNode(
+            id=path_prefix,
+            molecule_hash=generate_molecule_hash(canon_smiles),
+            smiles=canon_smiles,
+            is_starting_material=is_starting_mat,
+            reactions=reactions,
+        )
