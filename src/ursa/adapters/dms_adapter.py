@@ -1,7 +1,12 @@
+from collections.abc import Generator
+from typing import Any
+
+from pydantic import ValidationError
+
 from ursa.adapters.base_adapter import BaseAdapter
 from ursa.domain.chem import canonicalize_smiles
-from ursa.domain.schemas import BenchmarkTree, DMSTree, MoleculeNode, ReactionNode, TargetInfo
-from ursa.exceptions import SchemaLogicError
+from ursa.domain.schemas import BenchmarkTree, DMSRouteList, DMSTree, MoleculeNode, ReactionNode, TargetInfo
+from ursa.exceptions import SchemaLogicError, UrsaException
 from ursa.typing import ReactionSmilesStr, SmilesStr
 from ursa.utils.hashing import generate_molecule_hash
 from ursa.utils.logging import logger
@@ -9,6 +14,30 @@ from ursa.utils.logging import logger
 
 class DMSAdapter(BaseAdapter):
     """Adapter for converting DMS-style model outputs to the BenchmarkTree schema."""
+
+    def adapt_raw_target_data(
+        self, raw_target_data: Any, target_info: TargetInfo
+    ) -> Generator[BenchmarkTree, None, None]:
+        """
+        Validates raw DMS data, transforms it, and yields BenchmarkTree objects.
+        """
+        try:
+            # 1. Model-specific validation happens HERE, inside the adapter.
+            validated_routes = DMSRouteList.model_validate(raw_target_data)
+        except ValidationError as e:
+            logger.warning(f"  - Raw data for target '{target_info.id}' failed DMS schema validation. Error: {e}")
+            return  # Stop processing this target
+
+        # 2. Iterate and transform each valid route
+        for dms_tree_root in validated_routes.root:
+            try:
+                # The private _transform method now only handles one route at a time
+                tree = self.transform(dms_tree_root, target_info)
+                yield tree
+            except UrsaException as e:
+                # A single route failed, log it and continue with the next one.
+                logger.warning(f"  - Route for '{target_info.id}' failed transformation: {e}")
+                continue
 
     def transform(self, raw_data: DMSTree, target_info: TargetInfo) -> BenchmarkTree:
         """
