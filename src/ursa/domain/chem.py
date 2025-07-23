@@ -37,6 +37,10 @@ def canonicalize_smiles(smiles: str) -> SmilesStr:
         canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
         return SmilesStr(canonical_smiles)
 
+    except InvalidSmilesError:
+        # This is our own specific, expected exception. Let it pass through untouched.
+        raise
+
     except Exception as e:
         logger.error(f"An unexpected RDKit error occurred for SMILES '{smiles}': {e}")
         # wrap the unknown error so the rest of the app doesn't need to know about rdkit specifics

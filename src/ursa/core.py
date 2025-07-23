@@ -81,7 +81,7 @@ def process_model_run(
         "run_hash": run_hash,
         "model_name": model_name,
         "results_file": output_filename,
-        "processing_timestamp_utc": datetime.datetime.utcnow().isoformat(timespec="seconds"),
+        "processing_timestamp_utc": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
         "source_files": source_file_info,
         "statistics": stats.to_manifest_dict(),
     }

@@ -21,4 +21,5 @@ repos:
         entry: mypy
         language: system
         types: [python]
-        args: [--strict, --ignore-missing-imports, --exclude=tests]
+        exclude: ^(tests/|src/burlak/dev/)
+        args: ["--config-file=pyproject.toml"]

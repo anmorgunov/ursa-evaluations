@@ -10,7 +10,7 @@ class InvalidSmilesError(UrsaException):
     pass
 
 
-class SchemaLogicError(UrsaException):
+class SchemaLogicError(UrsaException, ValueError):
     """Raised when data violates the logical rules of a schema, beyond basic type validation."""
 
     pass
