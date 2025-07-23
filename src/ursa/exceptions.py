@@ -16,6 +16,12 @@ class SchemaLogicError(UrsaException):
     pass
 
 
+class AdapterLogicError(UrsaException):
+    """Raised when an adapter fails to correctly fulfill its transformation contract."""
+
+    pass
+
+
 class UrsaIOException(UrsaException):
     """Raised for file system or I/O related errors during processing."""
 

@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from ursa.adapters.base_adapter import BaseAdapter
 from ursa.domain.chem import canonicalize_smiles
 from ursa.domain.schemas import BenchmarkTree, DMSRouteList, DMSTree, MoleculeNode, ReactionNode, TargetInfo
-from ursa.exceptions import SchemaLogicError, UrsaException
+from ursa.exceptions import AdapterLogicError, UrsaException
 from ursa.typing import ReactionSmilesStr, SmilesStr
 from ursa.utils.hashing import generate_molecule_hash
 from ursa.utils.logging import logger
@@ -15,9 +15,7 @@ from ursa.utils.logging import logger
 class DMSAdapter(BaseAdapter):
     """Adapter for converting DMS-style model outputs to the BenchmarkTree schema."""
 
-    def adapt_raw_target_data(
-        self, raw_target_data: Any, target_info: TargetInfo
-    ) -> Generator[BenchmarkTree, None, None]:
+    def adapt(self, raw_target_data: Any, target_info: TargetInfo) -> Generator[BenchmarkTree, None, None]:
         """
         Validates raw DMS data, transforms it, and yields BenchmarkTree objects.
         """
@@ -32,14 +30,14 @@ class DMSAdapter(BaseAdapter):
         for dms_tree_root in validated_routes.root:
             try:
                 # The private _transform method now only handles one route at a time
-                tree = self.transform(dms_tree_root, target_info)
+                tree = self._transform(dms_tree_root, target_info)
                 yield tree
             except UrsaException as e:
                 # A single route failed, log it and continue with the next one.
                 logger.warning(f"  - Route for '{target_info.id}' failed transformation: {e}")
                 continue
 
-    def transform(self, raw_data: DMSTree, target_info: TargetInfo) -> BenchmarkTree:
+    def _transform(self, raw_data: DMSTree, target_info: TargetInfo) -> BenchmarkTree:
         """
         Orchestrates the transformation of a single DMS output tree.
         Raises UrsaException on failure.
@@ -55,7 +53,7 @@ class DMSAdapter(BaseAdapter):
                 f"Expected canonical: {target_info.smiles}, but adapter produced: {retrosynthetic_tree.smiles}"
             )
             logger.error(msg)
-            raise SchemaLogicError(msg)
+            raise AdapterLogicError(msg)
 
         return BenchmarkTree(target=target_info, retrosynthetic_tree=retrosynthetic_tree)
 

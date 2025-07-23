@@ -26,8 +26,6 @@ import gzip
 import json
 from pathlib import Path
 
-# --- Imports from our Ursa package ---
-# We built the package, now we use it.
 from ursa.adapters.dms_adapter import DMSAdapter
 from ursa.core import process_model_run
 from ursa.domain.chem import canonicalize_smiles

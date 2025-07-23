@@ -54,7 +54,7 @@ def process_model_run(
                 continue
 
             # This is now fully generic. The adapter handles all the specifics.
-            transformed_trees = list(adapter.adapt_raw_target_data(raw_routes_list, targets_map[target_id]))
+            transformed_trees = list(adapter.adapt(raw_routes_list, targets_map[target_id]))
 
             # Deduplicate the successful routes for this target
             unique_trees = deduplicate_routes(transformed_trees)
