@@ -1,6 +1,5 @@
 import argparse
 import json
-import pickle
 import time
 from pathlib import Path
 
@@ -10,7 +9,7 @@ from directmultistep.utils.post_process import find_path_strings_with_commercial
 from directmultistep.utils.pre_process import canonicalize_smiles
 from tqdm import tqdm
 
-from ursa.io import load_targets_csv
+from ursa.io import load_targets_csv, save_json_gz
 
 base_dir = Path(__file__).resolve().parents[2]
 
@@ -39,13 +38,13 @@ if __name__ == "__main__":
     folder_name = f"dms-{model_name}_fp16" if use_fp16 else f"dms-{model_name}"
     save_dir = base_dir / "data" / "evaluations" / folder_name
     save_dir.mkdir(parents=True, exist_ok=True)
-    SAVED_PATH = save_dir / "paths.pkl"
-    SAVED_COUNT_PATH = save_dir / "count.json"
 
     logger.info("Retrosythesis starting")
     start = time.time()
 
-    all_paths = {}
+    valid_results = {}
+    buyable_results = {}
+    emol_results = {}
     raw_solved_count = 0
     buyable_solved_count = 0
     emol_solved_count = 0
@@ -89,7 +88,9 @@ if __name__ == "__main__":
         logger.info(f"Current raw solved count: {raw_solved_count}")
         logger.info(f"Current buyable solved count: {buyable_solved_count}")
         logger.info(f"Current emol solved count: {emol_solved_count}")
-        all_paths[target_key] = [raw_paths, buyables_paths, emol_paths]
+        valid_results[target_key] = [eval(p) for p in raw_paths]
+        buyable_results[target_key] = [eval(p) for p in buyables_paths]
+        emol_results[target_key] = [eval(p) for p in emol_paths]
 
     end = time.time()
 
@@ -100,10 +101,11 @@ if __name__ == "__main__":
         "time_elapsed": end - start,
     }
     logger.info(f"Results: {results}")
-    with open(SAVED_COUNT_PATH, "w") as f:
+    with open(save_dir / "results.json", "w") as f:
         json.dump(results, f)
-    with open(SAVED_PATH, "wb") as f:
-        pickle.dump(all_paths, f)
+    save_json_gz(valid_results, save_dir / "valid_results.json.gz")
+    save_json_gz(buyable_results, save_dir / "buyable_results.json.gz")
+    save_json_gz(emol_results, save_dir / "emol_results.json.gz")
 
     usage = """
     python scripts/dms/run-dms-predictions.py --model_name "flash" --use_fp16

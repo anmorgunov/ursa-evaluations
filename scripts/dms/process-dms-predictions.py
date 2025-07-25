@@ -22,54 +22,13 @@ Example Usage:
 """
 
 import argparse
-import gzip
-import json
 from pathlib import Path
 
 from ursa.adapters.dms_adapter import DMSAdapter
 from ursa.core import process_model_run
-from ursa.domain.chem import canonicalize_smiles
-from ursa.domain.schemas import TargetInfo
 from ursa.exceptions import UrsaException
+from ursa.io import load_and_prepare_targets
 from ursa.utils.logging import logger
-
-
-def load_and_prepare_targets(file_path: Path) -> dict[str, TargetInfo]:
-    """
-    Loads a JSON file containing target IDs and SMILES, canonicalizes the SMILES,
-    and prepares a dictionary of TargetInfo objects.
-
-    Args:
-        file_path: Path to the JSON file.
-                   Expected format: {"target_id_1": "SMILES_1", ...}
-
-    Returns:
-        A dictionary mapping target IDs to validated TargetInfo objects.
-
-    Raises:
-        UrsaException: If a target SMILES is invalid.
-    """
-    logger.info(f"Loading and preparing targets from {file_path}...")
-    try:
-        with gzip.open(file_path, "rt") as f:
-            targets_json = json.load(f)
-    except (OSError, json.JSONDecodeError) as e:
-        logger.error(f"Failed to read or parse targets file: {e}")
-        raise UrsaException from e
-
-    prepared_targets: dict[str, TargetInfo] = {}
-    for target_id, raw_smiles in targets_json.items():
-        try:
-            # Canonicalize smiles right at the start.
-            canon_smiles = canonicalize_smiles(raw_smiles)
-            prepared_targets[target_id] = TargetInfo(id=target_id, smiles=canon_smiles)
-        except UrsaException as e:
-            logger.error(f"Invalid SMILES for target '{target_id}': {raw_smiles}. Cannot proceed.")
-            # This is a fatal error for a run; we must have valid targets.
-            raise e
-
-    logger.info(f"Successfully prepared {len(prepared_targets)} targets.")
-    return prepared_targets
 
 
 def main() -> None:
