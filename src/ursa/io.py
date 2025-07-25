@@ -66,7 +66,7 @@ def save_json(data: dict[str, Any], path: Path) -> None:
         raise UrsaIOException(f"Data saving error on {path}: {e}") from e
 
 
-def load_csv(path: Path) -> list[dict[str, str]]:
+def load_targets_csv(path: Path) -> dict[str, str]:
     """
     Loads a CSV file into a list of dictionaries, where each dictionary represents a row
     with column headers as keys.
@@ -77,10 +77,10 @@ def load_csv(path: Path) -> list[dict[str, str]]:
     try:
         with path.open("r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            data = list(reader)
+            data = {row["Structure ID"]: row["SMILES"] for row in reader}
             if not data:
                 logger.warning(f"CSV file {path} is empty")
-            return data
+            return data  # type: ignore
     except OSError as e:
         logger.error(f"Failed to read CSV file: {path}")
         raise UrsaIOException(f"Data loading error on {path}: {e}") from e

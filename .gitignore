@@ -26,3 +26,5 @@ data/**/*.csv
 data/models/
 # AI
 _prompts/
+
+clone.sh
