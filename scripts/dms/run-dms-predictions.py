@@ -3,9 +3,14 @@ import json
 import time
 from pathlib import Path
 
-from directmultistep.generate import generate_routes
+from directmultistep.generate import create_beam_search, load_model, prepare_input_tensors
+from directmultistep.model import ModelFactory
+from directmultistep.utils.dataset import RoutesProcessing
 from directmultistep.utils.logging_config import logger
-from directmultistep.utils.post_process import find_path_strings_with_commercial_sm
+from directmultistep.utils.post_process import (
+    find_path_strings_with_commercial_sm,
+    find_valid_paths,
+)
 from directmultistep.utils.pre_process import canonicalize_smiles
 from tqdm import tqdm
 
@@ -49,34 +54,47 @@ if __name__ == "__main__":
     buyable_solved_count = 0
     emol_solved_count = 0
 
+    model = load_model(model_name, dms_dir / "checkpoints", use_fp16)
+
+    rds = RoutesProcessing(metadata_path=dms_dir / "dms_dictionary.yaml")
+    product_max_length, sm_max_length, beam_obj = create_beam_search(model, 50, dms_dir / "dms_dictionary.yaml")
+
     for target_key, target_smiles in tqdm(targets.items()):
         target = canonicalize_smiles(target_smiles)
-        raw_paths = []
+        all_beam_results_NS2 = []
         if model_name == "explorer XL" or model_name == "explorer":
-            raw_paths += generate_routes(
-                target,
-                n_steps=None,
-                starting_material=None,
-                beam_size=50,
-                model=model_name,
-                config_path=dms_dir / "dms_dictionary.yaml",
-                ckpt_dir=dms_dir / "checkpoints",
-                commercial_stock=None,
-                use_fp16=use_fp16,
+            # Prepare input tensors
+            encoder_inp, steps_tens, path_tens = prepare_input_tensors(
+                target, None, None, rds, product_max_length, sm_max_length, use_fp16
             )
+
+            # Run beam search
+            device = ModelFactory.determine_device()
+            beam_result_BS2 = beam_obj.decode(
+                src_BC=encoder_inp.to(device),
+                steps_B1=steps_tens.to(device) if steps_tens is not None else None,
+                path_start_BL=path_tens.to(device),
+            )
+            for beam_result_S2 in beam_result_BS2:
+                all_beam_results_NS2.append(beam_result_S2)
         else:
             for step in range(2, 9):
-                raw_paths += generate_routes(
-                    target,
-                    n_steps=step,
-                    starting_material=None,
-                    beam_size=50,
-                    model=model_name,
-                    config_path=dms_dir / "dms_dictionary.yaml",
-                    ckpt_dir=dms_dir / "checkpoints",
-                    commercial_stock=None,
-                    use_fp16=use_fp16,
+                # Prepare input tensors
+                encoder_inp, steps_tens, path_tens = prepare_input_tensors(
+                    target, step, None, rds, product_max_length, sm_max_length, use_fp16
                 )
+
+                # Run beam search
+                device = ModelFactory.determine_device()
+                beam_result_BS2 = beam_obj.decode(
+                    src_BC=encoder_inp.to(device),
+                    steps_B1=steps_tens.to(device) if steps_tens is not None else None,
+                    path_start_BL=path_tens.to(device),
+                )
+                for beam_result_S2 in beam_result_BS2:
+                    all_beam_results_NS2.append(beam_result_S2)
+        valid_paths_NS2n = find_valid_paths(all_beam_results_NS2)
+        raw_paths = [beam_result[0] for beam_result in valid_paths_NS2n[0]]
         buyables_paths = find_path_strings_with_commercial_sm(raw_paths, commercial_stock=buyables_stock_set)
         emol_paths = find_path_strings_with_commercial_sm(raw_paths, commercial_stock=emol_stock_set)
         if len(raw_paths) > 0:
