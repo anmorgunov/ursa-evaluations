@@ -1,3 +1,4 @@
+import csv
 import gzip
 import json
 from pathlib import Path
@@ -63,3 +64,26 @@ def save_json(data: dict[str, Any], path: Path) -> None:
     except OSError as e:
         logger.error(f"Failed to write to JSON file: {path}")
         raise UrsaIOException(f"Data saving error on {path}: {e}") from e
+
+
+def load_csv(path: Path) -> list[dict[str, str]]:
+    """
+    Loads a CSV file into a list of dictionaries, where each dictionary represents a row
+    with column headers as keys.
+
+    The CSV must have a header row. Each row is returned as a dictionary where the keys
+    are the column headers and values are strings.
+    """
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            data = list(reader)
+            if not data:
+                logger.warning(f"CSV file {path} is empty")
+            return data
+    except OSError as e:
+        logger.error(f"Failed to read CSV file: {path}")
+        raise UrsaIOException(f"Data loading error on {path}: {e}") from e
+    except csv.Error as e:
+        logger.error(f"Failed to parse CSV file: {path}")
+        raise UrsaIOException(f"CSV parsing error on {path}: {e}") from e

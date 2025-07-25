@@ -22,6 +22,7 @@ wheels/
 data/evaluations/
 data/processed/
 data/**/*.json.gz
-
+data/**/*.csv
+data/models/
 # AI
 _prompts/
