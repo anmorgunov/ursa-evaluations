@@ -14,11 +14,11 @@ This script performs the following actions:
 6.  Creates a manifest.json file to allow for verification of the run.
 
 Example Usage:
-    python scripts/process-dms-predictions.py \
-        --model-name "dms_explorer_xl_961_buy" \
-        --raw-dir "data/evaluations/dms_explorer_xl_buy" \
-        --output-dir "data/processed/dms_explorer_xl_buy" \
-        --targets-file "data/ReRSA_dataset_961_smiles.json.gz"
+    python scripts/dms/process-dms-predictions.py \
+        --model-name "dms-wide-fp16" \
+        --raw-file "data/evaluations/dms-wide_fp16/buyable_results.json.gz" \
+        --output-dir "data/processed/dms-wide-first-25-fp16" \
+        --targets-file "data/rs_first_25.csv"
 """
 
 import argparse
@@ -37,16 +37,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Transform DMS model outputs for the Ursa benchmark.")
     parser.add_argument("--model-name", type=str, required=True, 
            help="A unique name for this model run (e.g., 'dms_v1_run1'). Used for anonymization.")
-    parser.add_argument("--raw-dir", type=Path, required=True,
-           help="Directory containing the raw *.json.gz output files from the DMS model.")
+    parser.add_argument("--raw-file", type=Path, required=True,
+           help="Path to the raw *.json.gz output file from the DMS model.")
     parser.add_argument("--output-dir", type=Path, required=True,
            help="Directory where the processed, anonymized data will be saved.")
     parser.add_argument("--targets-file", type=Path, required=True,
            help="Path to a JSON file mapping target IDs to their SMILES strings.")
     # fmt:on
     args = parser.parse_args()
-    base_dir = Path(__file__).resolve().parents[1]
-    args.raw_dir = base_dir / args.raw_dir
+    base_dir = Path(__file__).resolve().parents[2]
+    args.raw_file = base_dir / args.raw_file
     args.output_dir = base_dir / args.output_dir
     args.targets_file = base_dir / args.targets_file
 
@@ -62,7 +62,7 @@ def main() -> None:
         process_model_run(
             model_name=args.model_name,
             adapter=dms_adapter,
-            raw_results_dir=args.raw_dir,
+            raw_results_file=args.raw_file,
             processed_dir=args.output_dir,
             targets_map=targets_map,
         )

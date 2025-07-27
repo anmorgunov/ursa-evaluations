@@ -3,15 +3,19 @@ import json
 import time
 from pathlib import Path
 
-from directmultistep.generate import create_beam_search, load_model, prepare_input_tensors
+from directmultistep.generate import create_beam_search, load_published_model, prepare_input_tensors
 from directmultistep.model import ModelFactory
 from directmultistep.utils.dataset import RoutesProcessing
 from directmultistep.utils.logging_config import logger
 from directmultistep.utils.post_process import (
+    canonicalize_paths,
     find_path_strings_with_commercial_sm,
     find_valid_paths,
+    remove_repetitions_within_beam_result,
 )
 from directmultistep.utils.pre_process import canonicalize_smiles
+from private.dataset import RoutesProcessing as RoutesProcessingPrivate
+from private.dataset import token_processor
 from tqdm import tqdm
 
 from ursa.io import load_targets_csv, save_json_gz
@@ -21,17 +25,19 @@ base_dir = Path(__file__).resolve().parents[2]
 targets = load_targets_csv(base_dir / "data" / "rs_first_25.csv")
 dms_dir = base_dir / "data" / "models" / "dms"
 
+MODEL_PRESETS = {"flash_10M", "flash_20M", "flex_20M", "deep_40M", "wide_40M", "explorer_19M", "explorer_xL_50M"}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name", type=str, required=True, help="Name of the model")
+    parser.add_argument("--model-name", type=str, required=True, help="Name of the model")
+    parser.add_argument("--ckpt-path", type=Path, help="path to the checkpoint file (if not using a published model)")
     parser.add_argument("--use_fp16", action="store_true", help="Whether to use FP16")
     args = parser.parse_args()
-    model_name = args.model_name
-    use_fp16 = args.use_fp16
+    if args.model_name not in MODEL_PRESETS:
+        raise ValueError(f"Unknown model name: {args.model_name}. Available models: {list(MODEL_PRESETS)}")
 
-    logger.info(f"model_name: {model_name}")
-    logger.info(f"use_fp16: {use_fp16}")
+    logger.info(f"model_name: {args.model_name}")
+    logger.info(f"use_fp16: {args.use_fp16}")
 
     logger.info("Loading targets and stock compounds")
 
@@ -40,7 +46,7 @@ if __name__ == "__main__":
     with open(dms_dir / "compounds" / "buyables-stock.txt") as f:
         buyables_stock_set = set(f.read().splitlines())
 
-    folder_name = f"dms-{model_name}_fp16" if use_fp16 else f"dms-{model_name}"
+    folder_name = f"dms-{args.model_name}_fp16" if args.use_fp16 else f"dms-{args.model_name}"
     save_dir = base_dir / "data" / "evaluations" / folder_name
     save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -54,58 +60,78 @@ if __name__ == "__main__":
     buyable_solved_count = 0
     emol_solved_count = 0
 
-    model = load_model(model_name, dms_dir / "checkpoints", use_fp16)
+    desired_device = "cuda"
+    device = ModelFactory.determine_device(desired_device)
+    if args.ckpt_path is None:
+        rds = RoutesProcessing(metadata_path=dms_dir / "dms_dictionary.yaml")
+        model = load_published_model(args.model_name, dms_dir / "checkpoints", args.use_fp16, device=desired_device)
+    else:
+        rds = RoutesProcessingPrivate(metadata_path=dms_dir / "dms_dictionary.yaml")
+        model = ModelFactory.from_preset(args.model_name, compile_model=False).create_model()
+        model = ModelFactory.load_checkpoint(model, args.ckpt_path, device)
+        if args.use_fp16:
+            model = model.half()  # Convert to FP16
 
-    rds = RoutesProcessing(metadata_path=dms_dir / "dms_dictionary.yaml")
-    product_max_length, sm_max_length, beam_obj = create_beam_search(model, 50, dms_dir / "dms_dictionary.yaml")
+    beam_obj = create_beam_search(model, 50, rds)
 
     for target_key, target_smiles in tqdm(targets.items()):
         target = canonicalize_smiles(target_smiles)
-        all_beam_results_NS2 = []
-        if model_name == "explorer XL" or model_name == "explorer":
-            # Prepare input tensors
-            encoder_inp, steps_tens, path_tens = prepare_input_tensors(
-                target, None, None, rds, product_max_length, sm_max_length, use_fp16
-            )
 
-            # Run beam search
+        # this holds all beam search outputs for a SINGLE target, across multiple step calls
+        all_beam_results_for_target_NS2: list[list[tuple[str, float]]] = []
+
+        if args.model_name == "explorer XL" or args.model_name == "explorer":
+            encoder_inp, steps_tens, path_tens = prepare_input_tensors(
+                target, None, None, rds, rds.product_max_length, rds.sm_max_length, args.use_fp16
+            )
             device = ModelFactory.determine_device()
-            beam_result_BS2 = beam_obj.decode(
+            beam_result_bs2 = beam_obj.decode(
                 src_BC=encoder_inp.to(device),
                 steps_B1=steps_tens.to(device) if steps_tens is not None else None,
                 path_start_BL=path_tens.to(device),
-            )
-            for beam_result_S2 in beam_result_BS2:
-                all_beam_results_NS2.append(beam_result_S2)
+                progress_bar=False,
+                token_processor=token_processor,
+            )  # list[list[tuple[str, float]]]
+            all_beam_results_for_target_NS2.extend(beam_result_bs2)
         else:
             for step in range(2, 9):
-                # Prepare input tensors
                 encoder_inp, steps_tens, path_tens = prepare_input_tensors(
-                    target, step, None, rds, product_max_length, sm_max_length, use_fp16
+                    target, step, None, rds, rds.product_max_length, rds.sm_max_length, args.use_fp16
                 )
-
-                # Run beam search
                 device = ModelFactory.determine_device()
-                beam_result_BS2 = beam_obj.decode(
+                beam_result_bs2 = beam_obj.decode(
                     src_BC=encoder_inp.to(device),
                     steps_B1=steps_tens.to(device) if steps_tens is not None else None,
                     path_start_BL=path_tens.to(device),
-                )
-                for beam_result_S2 in beam_result_BS2:
-                    all_beam_results_NS2.append(beam_result_S2)
-        valid_paths_NS2n = find_valid_paths(all_beam_results_NS2)
-        raw_paths = [beam_result[0] for beam_result in valid_paths_NS2n[0]]
+                    progress_bar=False,
+                    token_processor=token_processor,
+                )  #  list[list[tuple[str, float]]]
+
+                all_beam_results_for_target_NS2.extend(beam_result_bs2)
+
+        valid_paths_per_batch = find_valid_paths(all_beam_results_for_target_NS2)
+
+        # flatten the list of path-lists into one big list of paths for this target (this is really necessary because we run the model several times with step range(2,9))
+        all_valid_paths_for_target = [path for batch in valid_paths_per_batch for path in batch]
+
+        # the processing function expects a list of batches. wrap our flat list to look like a single batch.
+        canon_paths_NS2n = canonicalize_paths([all_valid_paths_for_target])
+        unique_paths_NS2n = remove_repetitions_within_beam_result(canon_paths_NS2n)
+
+        # unwrap the single batch from the result
+        raw_paths = [beam_result[0] for beam_result in unique_paths_NS2n[0]]
+
         buyables_paths = find_path_strings_with_commercial_sm(raw_paths, commercial_stock=buyables_stock_set)
         emol_paths = find_path_strings_with_commercial_sm(raw_paths, commercial_stock=emol_stock_set)
-        if len(raw_paths) > 0:
-            raw_solved_count += 1
-        if len(buyables_paths) > 0:
-            buyable_solved_count += 1
-        if len(emol_paths) > 0:
-            emol_solved_count += 1
+
+        raw_solved_count += bool(raw_paths)
+        buyable_solved_count += bool(buyables_paths)
+        emol_solved_count += bool(emol_paths)
+
         logger.info(f"Current raw solved count: {raw_solved_count}")
         logger.info(f"Current buyable solved count: {buyable_solved_count}")
         logger.info(f"Current emol solved count: {emol_solved_count}")
+
         valid_results[target_key] = [eval(p) for p in raw_paths]
         buyable_results[target_key] = [eval(p) for p in buyables_paths]
         emol_results[target_key] = [eval(p) for p in emol_paths]
@@ -126,6 +152,6 @@ if __name__ == "__main__":
     save_json_gz(emol_results, save_dir / "emol_results.json.gz")
 
     usage = """
-    python scripts/dms/run-dms-predictions.py --model_name "flash" --use_fp16
+    python scripts/dms/run-dms-predictions.py --model-name "flash_10M" --use_fp16
     """
     logger.info(usage)

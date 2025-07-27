@@ -16,7 +16,7 @@ from ursa.utils.logging import logger
 def process_model_run(
     model_name: str,
     adapter: BaseAdapter,
-    raw_results_dir: Path,
+    raw_results_file: Path,
     processed_dir: Path,
     targets_map: dict[str, TargetInfo],
 ) -> None:
@@ -25,20 +25,20 @@ def process_model_run(
     """
     logger.info(f"--- Starting Ursa Processing for Model: '{model_name}' ---")
     processed_dir.mkdir(parents=True, exist_ok=True)
-    raw_files = sorted(list(raw_results_dir.glob("*.json.gz")))
+    # raw_files = sorted(list(raw_results_dir.glob("*.json.gz")))
 
-    if not raw_files:
-        logger.warning(f"No '.json.gz' files found in {raw_results_dir}. Aborting.")
-        return
+    # if not raw_files:
+    #     logger.warning(f"No '.json.gz' files found in {raw_results_dir}. Aborting.")
+    #     return
 
-    run_hash = generate_run_hash(model_name, [get_file_hash(p) for p in raw_files])
+    run_hash = generate_run_hash(model_name, [get_file_hash(raw_results_file)])
     logger.info(f"Generated unique run hash: '{run_hash}'")
 
     final_output_data: dict[str, list[dict[str, Any]]] = {}  # Store as dicts for direct JSON serialization
     stats = RunStatistics()
     source_file_info = {}
 
-    for file_path in raw_files:
+    for file_path in [raw_results_file]:
         try:
             logger.info(f"Processing file: {file_path.name}")
             raw_data_per_target = load_json_gz(file_path)
