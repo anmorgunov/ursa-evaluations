@@ -22,7 +22,8 @@ from ursa.io import load_targets_csv, save_json_gz
 
 base_dir = Path(__file__).resolve().parents[2]
 
-targets = load_targets_csv(base_dir / "data" / "rs_first_25.csv")
+target_name = "rs-first-25"
+targets = load_targets_csv(base_dir / "data" / f"{target_name}.csv")
 dms_dir = base_dir / "data" / "models" / "dms"
 
 MODEL_PRESETS = {"flash_10M", "flash_20M", "flex_20M", "deep_40M", "wide_40M", "explorer_19M", "explorer_xL_50M"}
@@ -46,7 +47,8 @@ if __name__ == "__main__":
     with open(dms_dir / "compounds" / "buyables-stock.txt") as f:
         buyables_stock_set = set(f.read().splitlines())
 
-    folder_name = f"dms-{args.model_name}_fp16" if args.use_fp16 else f"dms-{args.model_name}"
+    model_name = args.model_name.replace("_", "-").replace(" ", "-")
+    folder_name = f"dms-{model_name}-{target_name}-fp16" if args.use_fp16 else f"dms-{model_name}-{target_name}"
     save_dir = base_dir / "data" / "evaluations" / folder_name
     save_dir.mkdir(parents=True, exist_ok=True)
 
