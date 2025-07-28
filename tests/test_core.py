@@ -69,7 +69,7 @@ def test_process_model_run_happy_path(tmp_path: Path, mocker: MockerFixture, asp
     process_model_run(
         model_name="test_model_v1",
         adapter=mock_adapter_instance,
-        raw_results_dir=raw_dir,
+        raw_results_file=raw_file_path,
         processed_dir=processed_dir,
         targets_map={"aspirin": aspirin_target_info},
     )
@@ -100,28 +100,3 @@ def test_process_model_run_happy_path(tmp_path: Path, mocker: MockerFixture, asp
 
     results_file_path = processed_dir / manifest["results_file"]
     assert results_file_path.exists()
-
-
-def test_process_model_run_no_files(tmp_path: Path, mocker: MockerFixture) -> None:
-    """Tests that the function exits gracefully if no raw files are found."""
-    # Arrange
-    raw_dir = tmp_path / "raw_empty"
-    processed_dir = tmp_path / "processed"
-    raw_dir.mkdir()
-    processed_dir.mkdir()
-    mock_adapter_instance = mocker.MagicMock(spec=BaseAdapter)
-
-    # Act
-    process_model_run(
-        model_name="test_model_v2",
-        adapter=mock_adapter_instance,
-        raw_results_dir=raw_dir,
-        processed_dir=processed_dir,
-        targets_map={},
-    )
-
-    # Assert
-    # The adapter should never have been called
-    mock_adapter_instance.adapt.assert_not_called()
-    # No files should have been created in the processed directory
-    assert len(list(processed_dir.iterdir())) == 0

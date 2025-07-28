@@ -33,6 +33,13 @@ dev = [
     "pytest-cov>=6.2.1",
     "pytest-mock>=3.14.1",
 ]
+dms = [
+    "directmultistep",
+]
+
+[tool.uv.sources]
+directmultistep = { git = "https://github.com/batistagroup/DirectMultiStep/", branch = "dev/relax-deps"}
+
 
 [tool.mypy]
 strict = true
