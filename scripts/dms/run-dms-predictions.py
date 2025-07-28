@@ -14,8 +14,6 @@ from directmultistep.utils.post_process import (
     remove_repetitions_within_beam_result,
 )
 from directmultistep.utils.pre_process import canonicalize_smiles
-from private.dataset import RoutesProcessing as RoutesProcessingPrivate
-from private.dataset import token_processor
 from tqdm import tqdm
 
 from ursa.io import load_targets_csv, save_json_gz
@@ -64,15 +62,8 @@ if __name__ == "__main__":
 
     desired_device = "cuda"
     device = ModelFactory.determine_device(desired_device)
-    if args.ckpt_path is None:
-        rds = RoutesProcessing(metadata_path=dms_dir / "dms_dictionary.yaml")
-        model = load_published_model(args.model_name, dms_dir / "checkpoints", args.use_fp16, device=desired_device)
-    else:
-        rds = RoutesProcessingPrivate(metadata_path=dms_dir / "dms_dictionary.yaml")
-        model = ModelFactory.from_preset(args.model_name, compile_model=False).create_model()
-        model = ModelFactory.load_checkpoint(model, args.ckpt_path, device)
-        if args.use_fp16:
-            model = model.half()  # Convert to FP16
+    rds = RoutesProcessing(metadata_path=dms_dir / "dms_dictionary.yaml")
+    model = load_published_model(args.model_name, dms_dir / "checkpoints", args.use_fp16, device=desired_device)
 
     beam_obj = create_beam_search(model, 50, rds)
 
@@ -92,7 +83,6 @@ if __name__ == "__main__":
                 steps_B1=steps_tens.to(device) if steps_tens is not None else None,
                 path_start_BL=path_tens.to(device),
                 progress_bar=False,
-                token_processor=token_processor,
             )  # list[list[tuple[str, float]]]
             all_beam_results_for_target_NS2.extend(beam_result_bs2)
         else:
@@ -106,7 +96,6 @@ if __name__ == "__main__":
                     steps_B1=steps_tens.to(device) if steps_tens is not None else None,
                     path_start_BL=path_tens.to(device),
                     progress_bar=False,
-                    token_processor=token_processor,
                 )  #  list[list[tuple[str, float]]]
 
                 all_beam_results_for_target_NS2.extend(beam_result_bs2)
@@ -154,6 +143,6 @@ if __name__ == "__main__":
     save_json_gz(emol_results, save_dir / "emol_results.json.gz")
 
     usage = """
-    python scripts/dms/run-dms-predictions.py --model-name "flash_10M" --use_fp16
+    python scripts/dms/run-dms-predictions.py --model-name "wide_40M" --use_fp16
     """
     logger.info(usage)
