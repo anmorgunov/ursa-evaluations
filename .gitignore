@@ -31,3 +31,7 @@ clone.sh
 
 # internal code
 scripts/dms/private/
+
+# Testing
+.coverage*
+coverage*
