@@ -20,9 +20,9 @@ from ursa.io import load_targets_csv, save_json_gz
 
 base_dir = Path(__file__).resolve().parents[2]
 
-target_name = "rs-first-25"
-targets = load_targets_csv(base_dir / "data" / f"{target_name}.csv")
+
 dms_dir = base_dir / "data" / "models" / "dms"
+
 
 MODEL_PRESETS = {"flash_10M", "flash_20M", "flex_20M", "deep_40M", "wide_40M", "explorer_19M", "explorer_xL_50M"}
 
@@ -31,7 +31,12 @@ if __name__ == "__main__":
     parser.add_argument("--model-name", type=str, required=True, help="Name of the model")
     parser.add_argument("--ckpt-path", type=Path, help="path to the checkpoint file (if not using a published model)")
     parser.add_argument("--use_fp16", action="store_true", help="Whether to use FP16")
+    parser.add_argument("--device", type=str, default="cuda", help="Device to use for model inference")
+    parser.add_argument("--target-name", type=str, required=True, help="Name of the target")
+    desired_device = parser.parse_args().device
     args = parser.parse_args()
+
+    targets = load_targets_csv(base_dir / "data" / f"{args.target_name}.csv")
     if args.model_name not in MODEL_PRESETS:
         raise ValueError(f"Unknown model name: {args.model_name}. Available models: {list(MODEL_PRESETS)}")
 
@@ -46,8 +51,8 @@ if __name__ == "__main__":
         buyables_stock_set = set(f.read().splitlines())
 
     model_name = args.model_name.replace("_", "-").replace(" ", "-")
-    folder_name = f"dms-{model_name}-{target_name}-fp16" if args.use_fp16 else f"dms-{model_name}-{target_name}"
-    save_dir = base_dir / "data" / "evaluations" / folder_name
+    folder_name = f"dms-{model_name}-fp16" if args.use_fp16 else f"dms-{model_name}"
+    save_dir = base_dir / "data" / "evaluations" / folder_name / args.target_name
     save_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Retrosythesis starting")
@@ -60,7 +65,6 @@ if __name__ == "__main__":
     buyable_solved_count = 0
     emol_solved_count = 0
 
-    desired_device = "cuda"
     device = ModelFactory.determine_device(desired_device)
     rds = RoutesProcessing(metadata_path=dms_dir / "dms_dictionary.yaml")
     model = load_published_model(args.model_name, dms_dir / "checkpoints", args.use_fp16, device=desired_device)
