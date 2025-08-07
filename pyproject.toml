@@ -3,7 +3,7 @@ name = "ursa"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.11.7",
     "rdkit>=2025.3.3",
@@ -36,10 +36,24 @@ dev = [
 dms = [
     "directmultistep",
 ]
+syntheseus = [
+    "dgl>=2.2.1",
+    "syntheseus[chemformer,local-retro,mhn-react,retro-knn,root-aligned]>=0.5.0",
+    "torch==2.3.0",
+    "torchdata==0.8.0",
+]
 
 [tool.uv.sources]
-directmultistep = { git = "https://github.com/batistagroup/DirectMultiStep/", branch = "dev/relax-deps"}
+directmultistep = { git = "https://github.com/batistagroup/DirectMultiStep/", branch = "main"}
+dgl = {url ="https://data.dgl.ai/wheels/dgl-2.2.1-cp311-cp311-macosx_11_0_arm64.whl"}
 
+[tool.uv]
+conflicts = [
+    [
+      { extra = "dms" },
+      { extra = "syntheseus" },
+    ],
+]
 
 [tool.mypy]
 strict = true

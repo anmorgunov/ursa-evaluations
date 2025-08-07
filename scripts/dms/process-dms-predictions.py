@@ -16,9 +16,15 @@ This script performs the following actions:
 Example Usage:
     python scripts/dms/process-dms-predictions.py \
         --model-name "dms-wide-fp16" \
-        --raw-file "data/evaluations/dms-wide_fp16/buyable_results.json.gz" \
-        --output-dir "data/processed/dms-wide-first-25-fp16" \
-        --targets-file "data/rs_first_25.csv"
+        --raw-file "data/evaluations/dms-explorer-XL-fp16/uspto-190/buyable_results.json.gz" \
+        --output-dir "data/processed/dms-explorer-XL-fp16/uspto-190" \
+        --targets-file "data/uspto-190.csv"
+
+    python scripts/dms/process-dms-predictions.py \
+        --model-name "dms-wide-fp16" \
+        --raw-file "data/evaluations/dms-wide-fp16/rs-first-25/buyable_results.json.gz" \
+        --output-dir "data/processed/dms-wide-fp16/rs-first-25" \
+        --targets-file "data/rs-first-25-targets.csv"
 """
 
 import argparse
@@ -42,7 +48,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, required=True,
            help="Directory where the processed, anonymized data will be saved.")
     parser.add_argument("--targets-file", type=Path, required=True,
-           help="Path to a JSON file mapping target IDs to their SMILES strings.")
+           help="Path to a CSV file mapping target IDs to their SMILES strings.")
     # fmt:on
     args = parser.parse_args()
     base_dir = Path(__file__).resolve().parents[2]
