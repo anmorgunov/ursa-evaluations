@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "pydantic>=2.11.7",
+    "pydantic",
     "rdkit>=2025.3.3",
     "tqdm>=4.67.1",
 ]
@@ -25,23 +25,18 @@ package-dir = { "" = "src" }
 dev = [
     "ipykernel>=6.29.5",
     "rich>=13.9.4",
-    "pre-commit>=4.1.0",
-    "ruff>=0.9.6",
-    "pytest>=8.3.4",
-    "mypy>=1.15.0",
+    "pre-commit",
+    "ruff",
+    "pytest",
+    "mypy",
     "types-tqdm>=4.67.0.20241221",
-    "pytest-cov>=6.2.1",
+    "pytest-cov",
     "pytest-mock>=3.14.1",
 ]
 dms = [
     "directmultistep",
 ]
-syntheseus = [
-    "dgl>=2.2.1",
-    "syntheseus[chemformer,local-retro,mhn-react,retro-knn,root-aligned]>=0.5.0",
-    "torch==2.3.0",
-    "torchdata==0.8.0",
-]
+
 
 [tool.uv.sources]
 directmultistep = { git = "https://github.com/batistagroup/DirectMultiStep/", branch = "main"}
@@ -52,6 +47,7 @@ conflicts = [
     [
       { extra = "dms" },
       { extra = "syntheseus" },
+      { extra = "synpa" },
     ],
 ]
 
