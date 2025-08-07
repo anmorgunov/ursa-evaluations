@@ -1,3 +1,8 @@
+"""
+Example usage:
+ DIRECTMULTISTEP_LOG_LEVEL=WARNING python scripts/dms/run-dms-predictions.py --model-name "explorer XL" --use_fp16 --target-name "ursa-bridge-100" --device "cuda:3"
+"""
+
 import argparse
 import json
 import time
@@ -24,8 +29,6 @@ base_dir = Path(__file__).resolve().parents[2]
 dms_dir = base_dir / "data" / "models" / "dms"
 
 
-MODEL_PRESETS = {"flash_10M", "flash_20M", "flex_20M", "deep_40M", "wide_40M", "explorer_19M", "explorer_xL_50M"}
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-name", type=str, required=True, help="Name of the model")
@@ -37,8 +40,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     targets = load_targets_csv(base_dir / "data" / f"{args.target_name}.csv")
-    if args.model_name not in MODEL_PRESETS:
-        raise ValueError(f"Unknown model name: {args.model_name}. Available models: {list(MODEL_PRESETS)}")
 
     logger.info(f"model_name: {args.model_name}")
     logger.info(f"use_fp16: {args.use_fp16}")
@@ -67,11 +68,13 @@ if __name__ == "__main__":
 
     device = ModelFactory.determine_device(desired_device)
     rds = RoutesProcessing(metadata_path=dms_dir / "dms_dictionary.yaml")
-    model = load_published_model(args.model_name, dms_dir / "checkpoints", args.use_fp16, device=desired_device)
+    model = load_published_model(args.model_name, dms_dir / "checkpoints", args.use_fp16, force_device=desired_device)
 
     beam_obj = create_beam_search(model, 50, rds)
 
-    for target_key, target_smiles in tqdm(targets.items()):
+    pbar = tqdm(targets.items(), desc="Finding retrosynthetic paths")
+
+    for target_key, target_smiles in pbar:
         target = canonicalize_smiles(target_smiles)
 
         # this holds all beam search outputs for a SINGLE target, across multiple step calls
@@ -81,7 +84,6 @@ if __name__ == "__main__":
             encoder_inp, steps_tens, path_tens = prepare_input_tensors(
                 target, None, None, rds, rds.product_max_length, rds.sm_max_length, args.use_fp16
             )
-            device = ModelFactory.determine_device()
             beam_result_bs2 = beam_obj.decode(
                 src_BC=encoder_inp.to(device),
                 steps_B1=steps_tens.to(device) if steps_tens is not None else None,
@@ -94,7 +96,6 @@ if __name__ == "__main__":
                 encoder_inp, steps_tens, path_tens = prepare_input_tensors(
                     target, step, None, rds, rds.product_max_length, rds.sm_max_length, args.use_fp16
                 )
-                device = ModelFactory.determine_device()
                 beam_result_bs2 = beam_obj.decode(
                     src_BC=encoder_inp.to(device),
                     steps_B1=steps_tens.to(device) if steps_tens is not None else None,
@@ -123,13 +124,12 @@ if __name__ == "__main__":
         buyable_solved_count += bool(buyables_paths)
         emol_solved_count += bool(emol_paths)
 
-        logger.info(f"Current raw solved count: {raw_solved_count}")
-        logger.info(f"Current buyable solved count: {buyable_solved_count}")
-        logger.info(f"Current emol solved count: {emol_solved_count}")
-
         valid_results[target_key] = [eval(p) for p in raw_paths]
         buyable_results[target_key] = [eval(p) for p in buyables_paths]
         emol_results[target_key] = [eval(p) for p in emol_paths]
+
+        # Update progress bar with current path counts
+        pbar.set_postfix({"Raw:": raw_solved_count, "Buyable:": buyable_solved_count, "eMol:": emol_solved_count})
 
     end = time.time()
 
@@ -147,6 +147,6 @@ if __name__ == "__main__":
     save_json_gz(emol_results, save_dir / "emol_results.json.gz")
 
     usage = """
-    python scripts/dms/run-dms-predictions.py --model-name "wide_40M" --use_fp16
+    python scripts/dms/run-dms-predictions.py --model-name "wide" --use_fp16 --target-name "ursa-bridge-100" --device "cuda:0"
     """
     logger.info(usage)
