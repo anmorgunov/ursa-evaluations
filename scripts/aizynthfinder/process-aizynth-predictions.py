@@ -1,6 +1,14 @@
-# scripts/aizynth/process-aizynth-predictions.py
 """
 Processes raw output from an AiZynthFinder-type retrosynthesis model.
+
+Usage example:
+
+python scripts/aizynthfinder/process-aizynth-predictions.py \
+    --model-name "aizynthfinder-mcts" \
+    --raw-file data/evaluations/aizynthfinder-retro-star/rs-first-25/results.json.gz \
+    --output-dir data/processed/aizynthfinder-retro-star/rs-first-25 \
+    --targets-file data/rs-first-25.csv
+
 """
 
 import argparse
