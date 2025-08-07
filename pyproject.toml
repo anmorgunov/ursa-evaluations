@@ -3,9 +3,9 @@ name = "ursa"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
-    "pydantic>=2.11.7",
+    "pydantic",
     "rdkit>=2025.3.3",
     "tqdm>=4.67.1",
 ]
@@ -25,21 +25,31 @@ package-dir = { "" = "src" }
 dev = [
     "ipykernel>=6.29.5",
     "rich>=13.9.4",
-    "pre-commit>=4.1.0",
-    "ruff>=0.9.6",
-    "pytest>=8.3.4",
-    "mypy>=1.15.0",
+    "pre-commit",
+    "ruff",
+    "pytest",
+    "mypy",
     "types-tqdm>=4.67.0.20241221",
-    "pytest-cov>=6.2.1",
+    "pytest-cov",
     "pytest-mock>=3.14.1",
 ]
 dms = [
     "directmultistep",
 ]
 
-[tool.uv.sources]
-directmultistep = { git = "https://github.com/batistagroup/DirectMultiStep/", branch = "dev/relax-deps"}
 
+[tool.uv.sources]
+directmultistep = { git = "https://github.com/batistagroup/DirectMultiStep/", branch = "main"}
+dgl = {url ="https://data.dgl.ai/wheels/dgl-2.2.1-cp311-cp311-macosx_11_0_arm64.whl"}
+
+[tool.uv]
+conflicts = [
+    [
+      { extra = "dms" },
+      { extra = "syntheseus" },
+      { extra = "synpa" },
+    ],
+]
 
 [tool.mypy]
 strict = true
