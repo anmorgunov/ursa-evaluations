@@ -1,6 +1,7 @@
 from typing import NewType
 
 SmilesStr = NewType("SmilesStr", str)
+InchiKeyStr = NewType("InchiKeyStr", str)
 """Represents a canonical SMILES string."""
 
 ReactionSmilesStr = NewType("ReactionSmilesStr", str)
