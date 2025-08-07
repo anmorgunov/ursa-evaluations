@@ -5,9 +5,9 @@ from ursa.domain.schemas import TargetInfo
 from ursa.typing import SmilesStr
 
 
+# fmt:off
 @pytest.fixture
 def aizynth_raw_output() -> list[dict]:
-    # fmt:off
     return [{"type": "mol", "smiles": "Cc1cccc(C)c1N(CC(=O)Nc1ccc(-c2ncon2)cc1)C(=O)C1CCS(=O)(=O)CC1",
             "children": [{"type": "reaction", "smiles": "[C:1]...>>Cl[C:1]...", 
                           "children": [{"type": "mol", "smiles": "Nc1ccc(-c2ncon2)cc1", "in_stock": True},
@@ -25,6 +25,30 @@ def aizynth_raw_output() -> list[dict]:
                         }]
             }]
 
+@pytest.fixture
+def aizynth_raw_output_branched() -> list[dict]:
+    """Second example from the user, with a different branching structure."""
+    return [{"type": "mol", "smiles": "Cc1cccc(C)c1N(CC(=O)Nc1ccc(-c2ncon2)cc1)C(=O)C1CCS(=O)(=O)CC1", "in_stock": False,
+            "children": [{"type": "reaction", "smiles": "[C:1]...>>Cl[C:1]...",
+                          "children": [{"type": "mol", "smiles": "Nc1ccc(-c2ncon2)cc1", "in_stock": True},
+                                       {"type": "mol", "smiles": "Cc1cccc(C)c1N(CC(=O)Cl)C(=O)C1CCS(=O)(=O)CC1", "in_stock": False,
+                                        "children": [{"type": "reaction", "smiles": "[C:1]...>>I[C:1]...",
+                                                      "children": [{"type": "mol", "smiles": "O=C(Cl)C1CCS(=O)(=O)CC1", "in_stock": False,
+                                                                    "children": [{"type": "reaction", "smiles": "[C:1]...>>Cl[C:1]...", "children": [
+                                                                                {"type": "mol", "smiles": "Cl", "in_stock": True},
+                                                                                {"type": "mol", "smiles": "O=C(O)C1CCS(=O)(=O)CC1", "in_stock": True}]
+                                                                                }]
+                                                                    },
+                                                                    {"type": "mol", "smiles": "Cc1cccc(C)c1NCC(=O)Cl", "in_stock": False,
+                                                                    "children": [{"type": "reaction", "smiles": "[C:1]...>>Cl[C:1]...", "children": [
+                                                                                    {"type": "mol", "smiles": "Cl", "in_stock": True},
+                                                                                    {"type": "mol", "smiles": "Cc1cccc(C)c1NCC(=O)O", "in_stock": True}]
+                                                                                }]
+                                                                    }]
+                                                    }]
+                                    }]
+                        }]
+            }]
 
 # fmt:on
 
@@ -79,6 +103,49 @@ def test_successful_transformation(aizynth_raw_output, target_info):
     # check reaction smiles generation
     expected_rxn1_smiles = "Cc1cccc(C)c1N(CC(=O)Cl)C(=O)C1CCS(=O)(=O)CC1.Nc1ccc(-c2ncon2)cc1>>Cc1cccc(C)c1N(CC(=O)Nc1ccc(-c2ncon2)cc1)C(=O)C1CCS(=O)(=O)CC1"
     assert rxn1.reaction_smiles == expected_rxn1_smiles
+
+
+def test_successful_transformation_branched(aizynth_raw_output_branched, target_info):
+    """NEW: Tests the second fixture with the more branched decomposition path."""
+    adapter = AizynthAdapter()
+    results = list(adapter.adapt(aizynth_raw_output_branched, target_info))
+
+    assert len(results) == 1
+    tree = results[0]
+    assert tree.target == target_info
+
+    # Level 1
+    root = tree.retrosynthetic_tree
+    assert not root.is_starting_material
+    assert len(root.reactions) == 1
+    rxn1 = root.reactions[0]
+    sorted_r1 = sorted(rxn1.reactants, key=lambda r: r.smiles)
+    # Products of first reaction
+    assert sorted_r1[0].smiles == "Cc1cccc(C)c1N(CC(=O)Cl)C(=O)C1CCS(=O)(=O)CC1"
+    assert sorted_r1[1].smiles == "Nc1ccc(-c2ncon2)cc1"
+    assert sorted_r1[1].is_starting_material
+
+    # Level 2
+    intermediate_mol = sorted_r1[0]
+    assert not intermediate_mol.is_starting_material
+    assert len(intermediate_mol.reactions) == 1
+    rxn2 = intermediate_mol.reactions[0]
+    sorted_r2 = sorted(rxn2.reactants, key=lambda r: r.smiles)
+    # Products of second reaction
+    assert sorted_r2[0].smiles == "Cc1cccc(C)c1NCC(=O)Cl"
+    assert sorted_r2[1].smiles == "O=C(Cl)C1CCS(=O)(=O)CC1"
+    assert not sorted_r2[0].is_starting_material
+    assert not sorted_r2[1].is_starting_material
+
+    # Level 3 (from one of the branches)
+    intermediate_mol_b = sorted_r2[1]  # O=C(Cl)C1CCS(=O)(=O)CC1
+    rxn3 = intermediate_mol_b.reactions[0]
+    sorted_r3 = sorted(rxn3.reactants, key=lambda r: r.smiles)
+    # Products of third reaction - these should be starting materials
+    assert sorted_r3[0].smiles == "Cl"
+    assert sorted_r3[1].smiles == "O=C(O)C1CCS(=O)(=O)CC1"
+    assert sorted_r3[0].is_starting_material
+    assert sorted_r3[1].is_starting_material
 
 
 def test_adapter_handles_malformed_input(target_info, caplog):
