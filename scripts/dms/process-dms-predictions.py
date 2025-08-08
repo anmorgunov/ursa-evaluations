@@ -16,10 +16,10 @@ This script performs the following actions:
 Example Usage:
     python scripts/dms/process-dms-predictions.py \
         --model-name "dms-wide-fp16" \
-        --raw-file "data/evaluations/dms-flash-fp16/ursa-bridge-100/buyable_results.json.gz" \
-        --output-dir "data/processed/dms-flash-fp16/ursa-bridge-100" \
+        --raw-file "data/evaluations/dms-deep-fp16/ursa-bridge-100/buyable_results.json.gz" \
+        --output-dir "data/processed/dms-deep-fp16/ursa-bridge-100" \
         --targets-file "data/ursa-bridge-100.csv" \
-        --top-k 1
+        --top-k 3
 
     python scripts/dms/process-dms-predictions.py \
         --model-name "dms-wide-fp16" \
