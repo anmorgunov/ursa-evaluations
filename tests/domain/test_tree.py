@@ -1,7 +1,7 @@
 # tests/test_tree.py
 
 from ursa.domain.schemas import BenchmarkTree, MoleculeNode, ReactionNode, TargetInfo
-from ursa.domain.tree import deduplicate_routes
+from ursa.domain.tree import calculate_route_length, deduplicate_routes, filter_top_k_per_length
 from ursa.utils.hashing import generate_molecule_hash
 
 
@@ -35,6 +35,57 @@ def _build_simple_tree(target_smiles: str, reactant_smiles_list: list[str]) -> B
     )
 
     return BenchmarkTree(target=target_info, retrosynthetic_tree=root_node)
+
+
+def _build_multi_step_tree() -> BenchmarkTree:
+    """Helper to build a 3-step tree: A+B>>C, C+D>>E, E+F>>G"""
+    target_info = TargetInfo(id="G", smiles="G")
+
+    # Starting materials
+    a_node = MoleculeNode(
+        id="a", molecule_hash=generate_molecule_hash("A"), smiles="A", is_starting_material=True, reactions=[]
+    )
+    b_node = MoleculeNode(
+        id="b", molecule_hash=generate_molecule_hash("B"), smiles="B", is_starting_material=True, reactions=[]
+    )
+    d_node = MoleculeNode(
+        id="d", molecule_hash=generate_molecule_hash("D"), smiles="D", is_starting_material=True, reactions=[]
+    )
+    f_node = MoleculeNode(
+        id="f", molecule_hash=generate_molecule_hash("F"), smiles="F", is_starting_material=True, reactions=[]
+    )
+
+    # Intermediate C: A + B >> C
+    c_reaction = ReactionNode(id="rxn-c", reaction_smiles="A.B>>C", reactants=[a_node, b_node])
+    c_node = MoleculeNode(
+        id="c",
+        molecule_hash=generate_molecule_hash("C"),
+        smiles="C",
+        is_starting_material=False,
+        reactions=[c_reaction],
+    )
+
+    # Intermediate E: C + D >> E
+    e_reaction = ReactionNode(id="rxn-e", reaction_smiles="C.D>>E", reactants=[c_node, d_node])
+    e_node = MoleculeNode(
+        id="e",
+        molecule_hash=generate_molecule_hash("E"),
+        smiles="E",
+        is_starting_material=False,
+        reactions=[e_reaction],
+    )
+
+    # Target G: E + F >> G
+    g_reaction = ReactionNode(id="rxn-g", reaction_smiles="E.F>>G", reactants=[e_node, f_node])
+    g_node = MoleculeNode(
+        id="g",
+        molecule_hash=generate_molecule_hash("G"),
+        smiles="G",
+        is_starting_material=False,
+        reactions=[g_reaction],
+    )
+
+    return BenchmarkTree(target=target_info, retrosynthetic_tree=g_node)
 
 
 def test_deduplicate_keeps_unique_routes() -> None:
@@ -364,3 +415,257 @@ def test_deduplicate_handles_identical_subtrees_in_different_branches() -> None:
 
     # Assert
     assert len(unique_routes) == 1
+
+
+def test_calculate_route_length_zero_step() -> None:
+    """Test route length calculation for a starting material (0 steps)."""
+    target_info = TargetInfo(id="A", smiles="A")
+    a_node = MoleculeNode(
+        id="a", molecule_hash=generate_molecule_hash("A"), smiles="A", is_starting_material=True, reactions=[]
+    )
+    tree = BenchmarkTree(target=target_info, retrosynthetic_tree=a_node)
+
+    assert calculate_route_length(tree.retrosynthetic_tree) == 0
+
+
+def test_calculate_route_length_one_step() -> None:
+    """Test route length calculation for a 1-step synthesis."""
+    tree = _build_simple_tree("T", ["A", "B"])
+    assert calculate_route_length(tree.retrosynthetic_tree) == 1
+
+
+def test_calculate_route_length_two_step() -> None:
+    """Test route length calculation for a 2-step synthesis."""
+    # Build: A+B>>C, then C+D>>T
+    target_info = TargetInfo(id="T", smiles="T")
+
+    a_node = MoleculeNode(
+        id="a", molecule_hash=generate_molecule_hash("A"), smiles="A", is_starting_material=True, reactions=[]
+    )
+    b_node = MoleculeNode(
+        id="b", molecule_hash=generate_molecule_hash("B"), smiles="B", is_starting_material=True, reactions=[]
+    )
+    c_node = MoleculeNode(
+        id="c", molecule_hash=generate_molecule_hash("C"), smiles="C", is_starting_material=True, reactions=[]
+    )
+
+    # A+B>>D, then D+C>>T2 (2 steps)
+    d_reaction = ReactionNode(id="rxn-d", reaction_smiles="A.B>>D", reactants=[a_node, b_node])
+    d_node = MoleculeNode(
+        id="d",
+        molecule_hash=generate_molecule_hash("D"),
+        smiles="D",
+        is_starting_material=False,
+        reactions=[d_reaction],
+    )
+
+    t2_reaction = ReactionNode(id="rxn-t2", reaction_smiles="D.C>>T2", reactants=[d_node, c_node])
+    t2_node = MoleculeNode(
+        id="t2",
+        molecule_hash=generate_molecule_hash("T2"),
+        smiles="T2",
+        is_starting_material=False,
+        reactions=[t2_reaction],
+    )
+    tree = BenchmarkTree(target=target_info, retrosynthetic_tree=t2_node)
+    assert calculate_route_length(tree.retrosynthetic_tree) == 2
+
+
+def test_calculate_route_length_three_step() -> None:
+    """Test route length calculation for a 3-step synthesis."""
+    # Build 3-step tree: A+B>>C, C+D>>E, E+F>>G
+    target_info = TargetInfo(id="G", smiles="G")
+
+    # Starting materials
+    a_node = MoleculeNode(
+        id="a", molecule_hash=generate_molecule_hash("A"), smiles="A", is_starting_material=True, reactions=[]
+    )
+    b_node = MoleculeNode(
+        id="b", molecule_hash=generate_molecule_hash("B"), smiles="B", is_starting_material=True, reactions=[]
+    )
+    d_node = MoleculeNode(
+        id="d", molecule_hash=generate_molecule_hash("D"), smiles="D", is_starting_material=True, reactions=[]
+    )
+    f_node = MoleculeNode(
+        id="f", molecule_hash=generate_molecule_hash("F"), smiles="F", is_starting_material=True, reactions=[]
+    )
+
+    # Intermediate C: A + B >> C
+    c_reaction = ReactionNode(id="rxn-c", reaction_smiles="A.B>>C", reactants=[a_node, b_node])
+    c_node = MoleculeNode(
+        id="c",
+        molecule_hash=generate_molecule_hash("C"),
+        smiles="C",
+        is_starting_material=False,
+        reactions=[c_reaction],
+    )
+
+    # Intermediate E: C + D >> E
+    e_reaction = ReactionNode(id="rxn-e", reaction_smiles="C.D>>E", reactants=[c_node, d_node])
+    e_node = MoleculeNode(
+        id="e",
+        molecule_hash=generate_molecule_hash("E"),
+        smiles="E",
+        is_starting_material=False,
+        reactions=[e_reaction],
+    )
+
+    # Target G: E + F >> G
+    g_reaction = ReactionNode(id="rxn-g", reaction_smiles="E.F>>G", reactants=[e_node, f_node])
+    g_node = MoleculeNode(
+        id="g",
+        molecule_hash=generate_molecule_hash("G"),
+        smiles="G",
+        is_starting_material=False,
+        reactions=[g_reaction],
+    )
+
+    tree = BenchmarkTree(target=target_info, retrosynthetic_tree=g_node)
+    assert calculate_route_length(tree.retrosynthetic_tree) == 3
+
+
+def test_filter_top_k_per_length_empty_list() -> None:
+    """Test filter_top_k_per_length with empty list."""
+    result = filter_top_k_per_length([], 5)
+    assert result == []
+
+
+def test_filter_top_k_per_length_zero_k() -> None:
+    """Test filter_top_k_per_length with k=0."""
+    tree = _build_simple_tree("T", ["A", "B"])
+    result = filter_top_k_per_length([tree], 0)
+    assert result == []
+
+
+def test_filter_top_k_per_length_negative_k() -> None:
+    """Test filter_top_k_per_length with negative k."""
+    tree = _build_simple_tree("T", ["A", "B"])
+    result = filter_top_k_per_length([tree], -1)
+    assert result == []
+
+
+def test_filter_top_k_per_length_single_route() -> None:
+    """Test filter_top_k_per_length with single route."""
+    tree = _build_simple_tree("T", ["A", "B"])
+    result = filter_top_k_per_length([tree], 1)
+    assert len(result) == 1
+    assert result[0] == tree
+
+
+def test_filter_top_k_per_length_multiple_lengths() -> None:
+    """Test filter_top_k_per_length with routes of different lengths."""
+    # Create routes with lengths 1, 2, and 3
+    route1 = _build_simple_tree("T1", ["A", "B"])  # length 1
+    route2 = _build_simple_tree("T2", ["A", "B"])  # length 1 (duplicate)
+    route3 = _build_simple_tree("T3", ["A", "B"])  # length 1 (duplicate)
+
+    # Create 2-step route
+    target_info = TargetInfo(id="T4", smiles="T4")
+    a_node = MoleculeNode(
+        id="a", molecule_hash=generate_molecule_hash("A"), smiles="A", is_starting_material=True, reactions=[]
+    )
+    b_node = MoleculeNode(
+        id="b", molecule_hash=generate_molecule_hash("B"), smiles="B", is_starting_material=True, reactions=[]
+    )
+    c_node = MoleculeNode(
+        id="c", molecule_hash=generate_molecule_hash("C"), smiles="C", is_starting_material=True, reactions=[]
+    )
+
+    # A+B>>D, then D+C>>T4 (2 steps)
+    d_reaction = ReactionNode(id="rxn-d", reaction_smiles="A.B>>D", reactants=[a_node, b_node])
+    d_node = MoleculeNode(
+        id="d",
+        molecule_hash=generate_molecule_hash("D"),
+        smiles="D",
+        is_starting_material=False,
+        reactions=[d_reaction],
+    )
+
+    t4_reaction = ReactionNode(id="rxn-t4", reaction_smiles="D.C>>T4", reactants=[d_node, c_node])
+    t4_node = MoleculeNode(
+        id="t4",
+        molecule_hash=generate_molecule_hash("T4"),
+        smiles="T4",
+        is_starting_material=False,
+        reactions=[t4_reaction],
+    )
+    route4 = BenchmarkTree(target=target_info, retrosynthetic_tree=t4_node)
+
+    # Create 3-step route
+    route5 = _build_simple_tree("T5", ["A", "B"])  # length 1
+    route6 = _build_simple_tree("T6", ["A", "B"])  # length 1
+
+    routes = [route1, route2, route3, route4, route5, route6]
+
+    # Test k=2 - should keep 2 routes of length 1, 1 route of length 2, 0 routes of length 3
+    result = filter_top_k_per_length(routes, 2)
+    assert len(result) == 3  # 2 (length 1) + 1 (length 2) + 0 (length 3)
+
+    # Verify we have the right distribution
+    lengths = [calculate_route_length(r.retrosynthetic_tree) for r in result]
+    assert lengths.count(1) == 2
+    assert lengths.count(2) == 1
+
+
+def test_filter_top_k_per_length_same_length_routes() -> None:
+    """Test filter_top_k_per_length with multiple routes of same length."""
+    # Create 5 routes of length 1
+    routes = [_build_simple_tree(f"T{i}", [f"A{i}", f"B{i}"]) for i in range(5)]
+
+    # Test k=3 - should keep 3 routes
+    result = filter_top_k_per_length(routes, 3)
+    assert len(result) == 3
+
+    # Test k=10 - should keep all 5 routes
+    result = filter_top_k_per_length(routes, 10)
+    assert len(result) == 5
+
+
+def test_integration_deduplication_and_filtering() -> None:
+    """Test integration of deduplication and top-k filtering."""
+    # Create routes with duplicates and different lengths
+    routes = []
+
+    # 3 identical routes of length 1
+    for _ in range(3):
+        routes.append(_build_simple_tree("T1", ["A", "B"]))
+
+    # 2 identical routes of length 2
+    for i in range(2):
+        target_info = TargetInfo(id="T2", smiles="T2")
+        a_node = MoleculeNode(
+            id=f"a{i}", molecule_hash=generate_molecule_hash("A"), smiles="A", is_starting_material=True, reactions=[]
+        )
+        b_node = MoleculeNode(
+            id=f"b{i}", molecule_hash=generate_molecule_hash("B"), smiles="B", is_starting_material=True, reactions=[]
+        )
+        c_node = MoleculeNode(
+            id=f"c{i}", molecule_hash=generate_molecule_hash("C"), smiles="C", is_starting_material=True, reactions=[]
+        )
+
+        d_reaction = ReactionNode(id=f"rxn-d{i}", reaction_smiles="A.B>>D", reactants=[a_node, b_node])
+        d_node = MoleculeNode(
+            id=f"d{i}",
+            molecule_hash=generate_molecule_hash("D"),
+            smiles="D",
+            is_starting_material=False,
+            reactions=[d_reaction],
+        )
+
+        t2_reaction = ReactionNode(id=f"rxn-t2_{i}", reaction_smiles="D.C>>T2", reactants=[d_node, c_node])
+        t2_node = MoleculeNode(
+            id=f"t2_{i}",
+            molecule_hash=generate_molecule_hash("T2"),
+            smiles="T2",
+            is_starting_material=False,
+            reactions=[t2_reaction],
+        )
+        routes.append(BenchmarkTree(target=target_info, retrosynthetic_tree=t2_node))
+
+    # Deduplicate first
+    deduped_routes = deduplicate_routes(routes)
+    assert len(deduped_routes) == 2  # Should have 1 unique route per length
+
+    # Then apply top-k filtering
+    filtered_routes = filter_top_k_per_length(deduped_routes, 1)
+    assert len(filtered_routes) == 2  # Should keep 1 route of each length

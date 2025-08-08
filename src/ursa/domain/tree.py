@@ -1,4 +1,5 @@
 import hashlib
+from collections import defaultdict
 
 from ursa.domain.schemas import BenchmarkTree, MoleculeNode
 from ursa.utils.logging import logger
@@ -64,3 +65,52 @@ def deduplicate_routes(routes: list[BenchmarkTree]) -> list[BenchmarkTree]:
         logger.debug(f"Removed {num_removed} duplicate routes.")
 
     return unique_routes
+
+
+def calculate_route_length(node: MoleculeNode) -> int:
+    """
+    Calculate the length of a route (number of reactions/steps).
+
+    This counts the number of reactions in the longest path from the target
+    to any starting material.
+    """
+    if node.is_starting_material:
+        return 0
+
+    if not node.reactions:
+        return 0
+
+    # Find the longest path among all reactants
+    max_length = 0
+    for reaction in node.reactions:
+        for reactant in reaction.reactants:
+            reactant_length = calculate_route_length(reactant)
+            max_length = max(max_length, reactant_length)
+
+    return max_length + 1
+
+
+def filter_top_k_per_length(routes: list[BenchmarkTree], k: int) -> list[BenchmarkTree]:
+    """
+    Filter routes to keep only top-k routes for each route length.
+
+    Routes are sorted by their length (number of reactions), and for each
+    unique length, we keep only the top-k routes based on their original order.
+    """
+    if k <= 0:
+        return []
+
+    # Group routes by their length
+    routes_by_length = defaultdict(list)
+    for route in routes:
+        length = calculate_route_length(route.retrosynthetic_tree)
+        routes_by_length[length].append(route)
+
+    # Keep top-k for each length
+    filtered_routes = []
+    for length in sorted(routes_by_length.keys()):
+        routes_for_length = routes_by_length[length]
+        filtered_routes.extend(routes_for_length[:k])
+
+    logger.debug(f"Filtered {len(routes)} routes to {len(filtered_routes)} routes (top-{k} per length)")
+    return filtered_routes

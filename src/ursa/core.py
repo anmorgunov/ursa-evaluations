@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 from ursa.adapters.base_adapter import BaseAdapter
 from ursa.domain.schemas import RunStatistics, TargetInfo
-from ursa.domain.tree import deduplicate_routes
+from ursa.domain.tree import deduplicate_routes, filter_top_k_per_length
 from ursa.exceptions import UrsaIOException
 from ursa.io import load_json_gz, save_json, save_json_gz
 from ursa.utils.hashing import generate_run_hash, get_file_hash
@@ -19,6 +19,7 @@ def process_model_run(
     raw_results_file: Path,
     processed_dir: Path,
     targets_map: dict[str, TargetInfo],
+    top_k_per_length: int | None = None,
 ) -> None:
     """
     Orchestrates the processing pipeline for a model's output, now fully decoupled.
@@ -55,6 +56,10 @@ def process_model_run(
 
             # This is now fully generic. The adapter handles all the specifics.
             transformed_trees = list(adapter.adapt(raw_routes_list, targets_map[target_id]))
+
+            # Apply top-k filtering by route length if specified
+            if top_k_per_length is not None:
+                transformed_trees = filter_top_k_per_length(transformed_trees, top_k_per_length)
 
             # Deduplicate the successful routes for this target
             unique_trees = deduplicate_routes(transformed_trees)

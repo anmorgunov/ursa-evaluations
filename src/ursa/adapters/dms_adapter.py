@@ -109,3 +109,21 @@ class DMSAdapter(BaseAdapter):
             is_starting_material=is_starting_mat,
             reactions=reactions,
         )
+
+    @staticmethod
+    def calculate_route_length(dms_node: DMSTree) -> int:
+        """
+        Calculate the length of a route from the raw DMS tree structure.
+
+        This counts the number of reactions (steps) in the longest path
+        from the target to any starting material.
+        """
+        if not dms_node.children:
+            return 0
+
+        max_child_length = 0
+        for child in dms_node.children:
+            child_length = DMSAdapter.calculate_route_length(child)
+            max_child_length = max(max_child_length, child_length)
+
+        return max_child_length + 1

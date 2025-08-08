@@ -16,9 +16,10 @@ This script performs the following actions:
 Example Usage:
     python scripts/dms/process-dms-predictions.py \
         --model-name "dms-wide-fp16" \
-        --raw-file "data/evaluations/dms-explorer-XL-fp16/uspto-190/buyable_results.json.gz" \
-        --output-dir "data/processed/dms-explorer-XL-fp16/uspto-190" \
-        --targets-file "data/uspto-190.csv"
+        --raw-file "data/evaluations/dms-flash-fp16/ursa-bridge-100/buyable_results.json.gz" \
+        --output-dir "data/processed/dms-flash-fp16/ursa-bridge-100" \
+        --targets-file "data/ursa-bridge-100.csv" \
+        --top-k 1
 
     python scripts/dms/process-dms-predictions.py \
         --model-name "dms-wide-fp16" \
@@ -49,6 +50,8 @@ def main() -> None:
            help="Directory where the processed, anonymized data will be saved.")
     parser.add_argument("--targets-file", type=Path, required=True,
            help="Path to a CSV file mapping target IDs to their SMILES strings.")
+    parser.add_argument("--top-k", type=int, default=None,
+           help="Keep only top-k routes for each route length (optional).")
     # fmt:on
     args = parser.parse_args()
     base_dir = Path(__file__).resolve().parents[2]
@@ -71,6 +74,7 @@ def main() -> None:
             raw_results_file=args.raw_file,
             processed_dir=args.output_dir,
             targets_map=targets_map,
+            top_k_per_length=args.top_k,
         )
         logger.info("🎉 Script finished successfully. 🎉")
 
