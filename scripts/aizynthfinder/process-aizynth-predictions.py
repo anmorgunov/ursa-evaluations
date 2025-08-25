@@ -4,10 +4,16 @@ Processes raw output from an AiZynthFinder-type retrosynthesis model.
 Usage example:
 
 python scripts/aizynthfinder/process-aizynth-predictions.py \
+    --model-name "aizynthfinder-retro-star" \
+    --raw-file data/evaluations/aizynthfinder-retro-star/ursa-bridge-100/results.json.gz \
+    --output-dir data/processed/aizynthfinder-retro-star/ursa-bridge-100 \
+    --targets-file data/ursa-bridge-100.csv
+
+python scripts/aizynthfinder/process-aizynth-predictions.py \
     --model-name "aizynthfinder-mcts" \
-    --raw-file data/evaluations/aizynthfinder-retro-star/rs-first-25/results.json.gz \
-    --output-dir data/processed/aizynthfinder-retro-star/rs-first-25 \
-    --targets-file data/rs-first-25.csv
+    --raw-file data/evaluations/aizynthfinder-mcts/ursa-bridge-100/results.json.gz \
+    --output-dir data/processed/aizynthfinder-mcts/ursa-bridge-100 \
+    --targets-file data/ursa-bridge-100.csv
 
 """
 

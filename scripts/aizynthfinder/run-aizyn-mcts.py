@@ -6,7 +6,7 @@ and saves results in a structured format similar to the DMS predictions script.
 
 Example usage:
     python scripts/aizynthfinder/run-aizyn-mcts.py --target-name "rs-first-2"
-    python scripts/aizynthfinder/run-aizyn-mcts.py --target-name "ursa-bridge-100"
+    python scripts/aizynthfinder/run-aizyn-mcts.py --target-name "ursa-bridge-100-rem4"
 
 The target CSV file should be located at: data/{target_name}.csv
 Results are saved to: data/evaluations/aizynthfinder-mcts/{target_name}/

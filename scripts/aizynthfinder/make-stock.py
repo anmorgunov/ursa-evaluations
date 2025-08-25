@@ -3,9 +3,9 @@
 Usage:
 
 uv run scripts/aizynthfinder/make-stock.py \
-    --files data/models/assets/buyables-stock-canon.txt \
+    --files data/models/assets/ursa-bb-stock-canon.csv \
     --source plain \
-    --output data/models/assets/buyables-stock.hdf5 \
+    --output data/models/assets/ursa-bb-stock.hdf5 \
     --target hdf5
 """
 
